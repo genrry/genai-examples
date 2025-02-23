@@ -33,7 +33,7 @@ Arguments:
 
 ## Aknowledgements
 
-Much of the code here is adapted from the official Google AI Studio examples:
+Much of the code here is adapted from the official Google Gemini examples:
 https://github.com/google-gemini/cookbook/blob/4437c15aa0bcb8f397b49f5b2e549f64e3a0985f/quickstarts/Get_started_LiveAPI.py
 https://github.com/google-gemini/cookbook/blob/d529f28a54885dd4ed9ab995f0414efad283b4cb/quickstarts/Get_started_LiveAPI_tools.ipynb
 """
@@ -46,6 +46,7 @@ import traceback
 
 import pyaudio
 from google import genai
+from google.genai import types
 
 if sys.version_info < (3, 11, 0):
     import exceptiongroup
@@ -123,12 +124,64 @@ class AudioLoop:
                 if text := response.text:
                     print(text, end="")
 
+                server_content = response.server_content
+                if server_content is not None:
+                    self.handle_server_content(server_content)
+                    # continue
+
+                tool_call = response.tool_call
+                if tool_call is not None:
+                    await self.handle_tool_call(tool_call)
+
             # If you interrupt the model, it sends a turn_complete.
             # For interruptions to work, we need to stop playback.
             # So empty out the audio queue because it may have loaded
             # much more audio than has played yet.
             while not self.audio_in_queue.empty():
                 self.audio_in_queue.get_nowait()
+
+    def handle_server_content(wf, server_content):
+        model_turn = server_content.model_turn
+        if model_turn:
+            for part in model_turn.parts:
+                executable_code = part.executable_code
+                if executable_code is not None:
+                    print("-------------------------------")
+                    print(f"``` python\n{executable_code.code}\n```")
+                    print("-------------------------------")
+
+                code_execution_result = part.code_execution_result
+                if code_execution_result is not None:
+                    print("-------------------------------")
+                    print(f"```\n{code_execution_result.output}\n```")
+                    print("-------------------------------")
+
+        grounding_metadata = getattr(server_content, "grounding_metadata", None)
+        if grounding_metadata is not None:
+            print(grounding_metadata.search_entry_point.rendered_content)
+
+        return
+
+    async def handle_tool_call(self, tool_call):
+        for fc in tool_call.function_calls:
+            if fc.name in function_map:
+                # Extract arguments from the function call
+                args = fc.args
+                # Call the actual function
+                result = function_map[fc.name](**args)
+
+                tool_response = types.LiveClientToolResponse(
+                    function_responses=[
+                        types.FunctionResponse(
+                            name=fc.name,
+                            id=fc.id,
+                            response={"result": result},
+                        )
+                    ]
+                )
+
+                print("\n>>> ", tool_response)
+                await self.session.send(input=tool_response)
 
     async def play_audio(self):
         stream = await asyncio.to_thread(
@@ -169,6 +222,38 @@ class AudioLoop:
             traceback.print_exception(EG)
 
 
+get_weather_def = {
+    "name": "get_weather",
+    "parameters": {
+        "type": "object",
+        "properties": {"city": {"type": "string", "description": "City name"}},
+    },
+}
+
+
+def get_weather(city: str) -> str:
+    """
+    Returns a simple weather description for the given city.
+
+    Args:
+        city: Name of the city to get weather for
+
+    Returns:
+        String with a weather description
+    """
+    return f"The weather in {city} is nice and sunny today!"
+
+
+# Dictionary mapping function names to their implementations
+function_map = {"get_weather": get_weather}
+
+tools = [
+    {"google_search": {}},
+    {"code_execution": {}},
+    {"function_declarations": [get_weather_def]},
+]
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -198,6 +283,7 @@ if __name__ == "__main__":
         "voice_config": {"prebuilt_voice_config": {"voice_name": args.voice_name}}
     }
     config = {
+        "tools": tools,
         "generation_config": {"response_modalities": [args.response_modality]},
         "system_instruction": args.system_prompt,
         "speech_config": speech_config,
