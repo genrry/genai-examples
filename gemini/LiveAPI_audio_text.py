@@ -30,6 +30,12 @@ Arguments:
   --voice_name        Voice to use (Aoede, Charon, Fenrir, Kore, or Puck). Default: Aoede
   --system_prompt     Custom system prompt for the AI. Default: Helpful assistant
   --response_modality Response type (AUDIO or TEXT). Default: AUDIO
+
+## Aknowledgements
+
+Much of the code here is adapted from the official Google AI Studio examples:
+https://github.com/google-gemini/cookbook/blob/4437c15aa0bcb8f397b49f5b2e549f64e3a0985f/quickstarts/Get_started_LiveAPI.py
+https://github.com/google-gemini/cookbook/blob/d529f28a54885dd4ed9ab995f0414efad283b4cb/quickstarts/Get_started_LiveAPI_tools.ipynb
 """
 
 import argparse
