@@ -113,7 +113,7 @@ class AudioLoop:
             data = await asyncio.to_thread(self.audio_stream.read, CHUNK_SIZE, **kwargs)
             await self.out_queue.put({"data": data, "mime_type": "audio/pcm"})
 
-    async def receive_audio(self):
+    async def receive_data(self):
         "Background task to reads from the websocket and write pcm chunks to the output queue"
         while True:
             turn = self.session.receive()
@@ -127,7 +127,7 @@ class AudioLoop:
                 server_content = response.server_content
                 if server_content is not None:
                     self.handle_server_content(server_content)
-                    # continue
+                    continue
 
                 tool_call = response.tool_call
                 if tool_call is not None:
@@ -141,6 +141,7 @@ class AudioLoop:
                 self.audio_in_queue.get_nowait()
 
     def handle_server_content(wf, server_content):
+        """Handles and prints server content, including code execution and grounding metadata."""
         model_turn = server_content.model_turn
         if model_turn:
             for part in model_turn.parts:
@@ -209,7 +210,7 @@ class AudioLoop:
                 send_text_task = tg.create_task(self.send_text())
                 tg.create_task(self.send_realtime())
                 tg.create_task(self.listen_audio())
-                tg.create_task(self.receive_audio())
+                tg.create_task(self.receive_data())
                 tg.create_task(self.play_audio())
 
                 await send_text_task
