@@ -23,7 +23,7 @@ This script creates an interactive session with Gemini AI model where:
 To run the script:
 
 ```
-python Get_started_LiveAPI.py [--voice_name VOICE] [--system_prompt PROMPT] [--response_modality {AUDIO,TEXT}]
+python LiveAPI_audio_text.py [--voice_name VOICE] [--system_prompt PROMPT] [--response_modality {AUDIO,TEXT}]
 ```
 
 Arguments:
